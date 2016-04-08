@@ -1,6 +1,8 @@
 services = {
   'apache2',
-  'nginx',
   'mongodb',
-  'mysql'
+  'mysql',
+  'nginx'
 }
+
+services = sorted(services)

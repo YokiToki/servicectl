@@ -6,15 +6,16 @@ import gtk
 import config
 
 class ServiceControl:
-    def __init__(self):
+    def __init__(self, title):
+        self.title = title
         self.tray = gtk.StatusIcon()
         self.tray.set_from_stock(gtk.STOCK_YES)
         self.tray.connect('activate', self.on_click)
         self.tray.connect('popup-menu', self.on_r_click)
-        self.tray.set_tooltip(('GTK Service Control'))
+        self.tray.set_tooltip(title)
 
     def debug(self, button):
-        print self.window
+        print self.model
 
     #################
     ## EVENTS HANDLE
@@ -22,27 +23,38 @@ class ServiceControl:
     def on_click(self, widget):
         if hasattr(self, 'window'):
             if self.window.get_property("visible"):
-                self.window.hide()
+                self.hide()
             else:
-                self.show_main_window() 
+                self.show() 
         else:
-            self.make_main_window()
-            self.show_main_window()
+            self.make()
+            self.show()
 
     def on_r_click(self, icon, event_button, event_time):
-        self.make_rc_menu(event_button, event_time)
+        self.menu(event_button, event_time)
+
+    def on_selection_changed(self, treeselection):
+        (model, iter) = treeselection.get_selected()
+        path = model.get_path(iter)
+        state = model.get_value(iter, 0)
+        self._buttons_toogle(state)
+        # print [path, state]
 
     ###########
     ## ACTIONS
     ###########
-    def make_main_window(self):
+    def make(self):
         self.window = gtk.Window(gtk.WINDOW_TOPLEVEL)
+        self.window.set_title(self.title)
         self.window.set_border_width(10)
-        
-    def show_main_window(self):
-        self.mainbox = gtk.ScrolledWindow()
-        self.mainbox.set_policy( gtk.POLICY_AUTOMATIC, gtk.POLICY_AUTOMATIC)
-        self.window.add(self.mainbox)
+
+        vbox_left = gtk.VBox()
+        vbox_right = gtk.VBox(False, 3)
+        hbox = gtk.HBox()
+
+        scrolledbox = gtk.ScrolledWindow()
+        scrolledbox.set_policy( gtk.POLICY_AUTOMATIC, gtk.POLICY_AUTOMATIC)
+        scrolledbox.set_size_request(250, 200)
 
         self.model = gtk.ListStore(bool, str) #@+
 
@@ -56,37 +68,64 @@ class ServiceControl:
             self.model.append([state, service])
 
         # Treeview
-        self.treeview = gtk.TreeView(self.model) #@+
+        treeview = gtk.TreeView(self.model) #@+
+        treeselection = treeview.get_selection()
+        treeselection.connect("changed", self.on_selection_changed)
 
         # State column
         col = gtk.TreeViewColumn( "State")
-        self.treeview.insert_column(col, 0)
         cell = gtk.CellRendererPixbuf()
         col.pack_start(cell, expand=False)
         col.set_cell_data_func(cell, self._render_icon)
+        treeview.insert_column(col, 0)
 
         # Service column
         col = gtk.TreeViewColumn( "Service")
-        self.treeview.append_column(col)
+        treeview.append_column(col)
         cell = gtk.CellRendererText()
         col.pack_start(cell, expand=False)
         col.set_attributes(cell, text=1)
         col.set_sort_column_id(1)
 
-        # Controls column
-        col = gtk.TreeViewColumn( "Controls")
-        self.treeview.append_column(col)
+        scrolledbox.add(treeview)
 
-        self.mainbox.set_size_request(250, 200)
-        self.mainbox.add(self.treeview)
+        self.start_btn = gtk.Button("Start")
+        self.start_btn.connect_object("clicked", self.debug, self.window)
+        self.start_btn.set_sensitive(False)
+        vbox_right.pack_start(self.start_btn, False)
+
+        self.restart_btn = gtk.Button("Restart")
+        self.restart_btn.connect_object("clicked", gtk.main_quit, self.window)
+        self.restart_btn.set_sensitive(False)
+        vbox_right.pack_start(self.restart_btn, False)
+
+        self.stop_btn = gtk.Button("Stop")
+        self.stop_btn.connect_object("clicked", self.debug, self.window)
+        self.stop_btn.set_sensitive(False)
+        vbox_right.pack_start(self.stop_btn, False)
+
+        align = gtk.Alignment(1, 0, 0, 0)
+        align.add(vbox_right)
+        align.set_padding(0, 0, 10, 0)
+
+        vbox_left.pack_start(scrolledbox, False)
+
+        hbox.add(vbox_left)
+        hbox.add(align)
+
+        self.window.add(hbox)
         
+    def show(self):
         self.window.show_all()
 
-    def make_rc_menu(self, event_button, event_time):
+    def hide(self):
+        self.window.hide()
+
+    def menu(self, event_button, event_time):
         menu = gtk.Menu()
 
         about = gtk.MenuItem("About")
-        about.connect('activate', self.make_about_dialog)
+        about.connect('activate', self.about)
         about.show()
         menu.append(about)
 
@@ -98,12 +137,12 @@ class ServiceControl:
         menu.popup(None, None, gtk.status_icon_position_menu,
                    event_button, event_time, self.tray)
 
-    def  make_about_dialog(self, widget):
+    def about(self, widget):
         about_dialog = gtk.AboutDialog()
         about_dialog.set_destroy_with_parent (True)
         about_dialog.set_icon_name ("GTK Service Control")
         about_dialog.set_name('GTK Service Control')
-        about_dialog.set_version('0.1')
+        about_dialog.set_version('0.2')
         about_dialog.set_copyright("(C) 2016 Stanislav Tamat")
         about_dialog.set_comments(("GUI program to control system services"))
         about_dialog.set_authors(['Stanislav Tamat <libastral.so@yandex.ru>'])
@@ -113,7 +152,6 @@ class ServiceControl:
     ########
     ## MISC
     ########
-
     def _render_icon(self, column, cell, model, iter):
         data = self.model.get_value(iter, 0)   
         if data == True:
@@ -122,6 +160,16 @@ class ServiceControl:
             stock = gtk.STOCK_NO
         pixbuf = self.window.render_icon(stock_id=stock, size=gtk.ICON_SIZE_MENU)
         cell.set_property('pixbuf', pixbuf)
+
+    def _buttons_toogle(self, state):
+        if state:
+            self.start_btn.set_sensitive(False)
+            self.restart_btn.set_sensitive(True)
+            self.stop_btn.set_sensitive(True)
+        else:
+            self.start_btn.set_sensitive(True)
+            self.restart_btn.set_sensitive(False)
+            self.stop_btn.set_sensitive(False)
 
     ########
     ## MAIN
@@ -132,5 +180,5 @@ class ServiceControl:
         gtk.main()
 
 if __name__ == "__main__":
-    servicecontrol = ServiceControl()
+    servicecontrol = ServiceControl("GTK Service Control")
     servicecontrol.main()
