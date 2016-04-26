@@ -35,10 +35,12 @@ class ServiceControl:
 
     def on_selection_changed(self, treeselection):
         (model, iter) = treeselection.get_selected()
-        path = model.get_path(iter)
-        state = model.get_value(iter, 0)
-        self._buttons_toogle(state)
-        # print [path, state]
+        self.current_iter = iter
+        self.current_path = model.get_path(iter)
+        self.current_state = model.get_value(iter, 0)
+        self.current_service = model.get_value(iter, 1)
+        self._buttons_toogle(self.current_state)
+        # print [self.current_path, self.current_state, self.current_service]
 
     ###########
     ## ACTIONS
@@ -68,39 +70,39 @@ class ServiceControl:
             self.model.append([state, service])
 
         # Treeview
-        treeview = gtk.TreeView(self.model) #@+
-        treeselection = treeview.get_selection()
+        self.treeview = gtk.TreeView(self.model) #@+
+        treeselection = self.treeview.get_selection()
         treeselection.connect("changed", self.on_selection_changed)
 
         # State column
-        col = gtk.TreeViewColumn( "State")
-        cell = gtk.CellRendererPixbuf()
-        col.pack_start(cell, expand=False)
-        col.set_cell_data_func(cell, self._render_icon)
-        treeview.insert_column(col, 0)
+        col = gtk.TreeViewColumn("State")
+        self.cell = gtk.CellRendererPixbuf()
+        col.pack_start(self.cell, expand=False)
+        col.set_cell_data_func(self.cell, self._render_icon)
+        self.treeview.insert_column(col, 0)
 
         # Service column
-        col = gtk.TreeViewColumn( "Service")
-        treeview.append_column(col)
+        col = gtk.TreeViewColumn("Service")
+        self.treeview.append_column(col)
         cell = gtk.CellRendererText()
         col.pack_start(cell, expand=False)
         col.set_attributes(cell, text=1)
         col.set_sort_column_id(1)
 
-        scrolledbox.add(treeview)
+        scrolledbox.add(self.treeview)
 
         self.start_btn = gtk.Button("Start")
-        self.start_btn.connect_object("clicked", self.debug, self.window)
+        self.start_btn.connect_object("clicked", self.service_start, self.window)
         self.start_btn.set_sensitive(False)
         vbox_right.pack_start(self.start_btn, False)
 
         self.restart_btn = gtk.Button("Restart")
-        self.restart_btn.connect_object("clicked", gtk.main_quit, self.window)
+        self.restart_btn.connect_object("clicked", self.service_restart, self.window)
         self.restart_btn.set_sensitive(False)
         vbox_right.pack_start(self.restart_btn, False)
 
         self.stop_btn = gtk.Button("Stop")
-        self.stop_btn.connect_object("clicked", self.debug, self.window)
+        self.stop_btn.connect_object("clicked", self.service_stop, self.window)
         self.stop_btn.set_sensitive(False)
         vbox_right.pack_start(self.stop_btn, False)
 
@@ -114,6 +116,18 @@ class ServiceControl:
         hbox.add(align)
 
         self.window.add(hbox)
+
+    def update(self):
+        treeselection = self.treeview.get_selection()
+        cmd = "systemctl is-active %s.service" % (self.current_service,)
+        out = os.popen(cmd).read().strip()
+        if out == 'active':
+            state = True
+        else:
+            state = False
+        self.model.set_value(self.current_iter, 0, state)
+        self._render_icon(0, self.cell, self.model, self.current_iter)
+        self.on_selection_changed(treeselection)
         
     def show(self):
         self.window.show_all()
@@ -148,6 +162,27 @@ class ServiceControl:
         about_dialog.set_authors(['Stanislav Tamat <libastral.so@yandex.ru>'])
         about_dialog.run()
         about_dialog.destroy()
+
+    #######
+    ## CMD
+    #######
+    def service_start(self, widget):
+        cmd = "systemctl start %s.service" % (self.current_service,)
+        out = os.popen(cmd).read().strip()
+        print out
+        self.update()
+
+    def service_restart(self, widget):
+        cmd = "systemctl restart %s.service" % (self.current_service,)
+        out = os.popen(cmd).read().strip()
+        print out
+        self.update()
+
+    def service_stop(self, widget):
+        cmd = "systemctl stop %s.service" % (self.current_service,)
+        out = os.popen(cmd).read().strip()
+        print out
+        self.update()
 
     ########
     ## MISC
