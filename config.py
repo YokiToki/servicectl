@@ -7,3 +7,7 @@ services = {
 }
 
 services = sorted(services)
+
+settings = {
+  'start_show': True
+}
