@@ -2,224 +2,252 @@
 # -*- coding: utf-8 -*-
 
 import os
-import pygtk
-pygtk.require('2.0')
-import gtk
 import config
+import gi
+gi.require_version('Gtk', '3.0')
+from gi.repository import Gtk
+
+APPIND_SUPPORT = True
+
+try:
+	gi.require_version('AppIndicator3', '0.1')
+	from gi.repository import AppIndicator3
+except:
+	APPIND_SUPPORT = False
 
 class ServiceControl:
-    def __init__(self, title):
-        self.title = title
-        self.tray = gtk.StatusIcon()
-        self.tray.set_from_stock(gtk.STOCK_YES)
-        self.tray.connect('activate', self.on_click)
-        self.tray.connect('popup-menu', self.on_r_click)
-        self.tray.set_tooltip(title)
+	def __init__(self, title):
+		icontheme = Gtk.IconTheme.get_default()
+		self.icon = icontheme.load_icon(Gtk.STOCK_PROPERTIES, 128, 0)
+		self.title = title
+		self.menu = Gtk.Menu()
 
-    def debug(self, button):
-        print self.model
+		if APPIND_SUPPORT:
+			self.tray = AppIndicator3.Indicator.new("gtk_service_ctl", Gtk.STOCK_YES, AppIndicator3.IndicatorCategory.SYSTEM_SERVICES)
+			self.tray.set_status(AppIndicator3.IndicatorStatus.ACTIVE)
+			self.add_menu_item(self.on_click, "Show/Hide")
+			self.tray.set_menu(self.menu)
+			self.tray.set_title(title)
+		else:
+			self.tray = Gtk.StatusIcon()
+			self.tray.set_from_stock(Gtk.STOCK_YES)
+			self.tray.connect('activate', self.on_click)
+			self.tray.connect('popup-menu', self.on_r_click)
+			self.tray.set_tooltip_text(title)
 
-    #################
-    ## EVENTS HANDLE
-    #################
-    def on_click(self, widget):
-        if hasattr(self, 'window'):
-            if self.window.get_property("visible"):
-                self.hide()
-            else:
-                self.show() 
-        else:
-            self.make()
-            self.show()
+		self.add_menu_item(self.about, "About")
+		self.add_menu_item(Gtk.main_quit, "Quit")
+		self.make()
 
-    def on_r_click(self, icon, event_button, event_time):
-        self.menu(event_button, event_time)
+	#################
+	## EVENTS HANDLE
+	#################
 
-    def on_selection_changed(self, treeselection):
-        (model, iter) = treeselection.get_selected()
-        self.current_iter = iter
-        self.current_path = model.get_path(iter)
-        self.current_state = model.get_value(iter, 0)
-        self.current_service = model.get_value(iter, 1)
-        self._buttons_toogle(self.current_state)
-        # print [self.current_path, self.current_state, self.current_service]
+	def on_click(self, w):
+		if self.window.get_property("visible"):
+			self.hide()
+		else:
+			self.show()
 
-    ###########
-    ## ACTIONS
-    ###########
-    def make(self):
-        self.window = gtk.Window(gtk.WINDOW_TOPLEVEL)
-        self.window.set_title(self.title)
-        self.window.set_border_width(10)
+	def on_r_click(self, icon, button, time):
+		self.get_tray_menu()
 
-        vbox_left = gtk.VBox()
-        vbox_right = gtk.VBox(False, 3)
-        hbox = gtk.HBox()
+		def pos(menu, aicon):
+			return (Gtk.StatusIcon.position_menu(menu, aicon))
 
-        scrolledbox = gtk.ScrolledWindow()
-        scrolledbox.set_policy( gtk.POLICY_AUTOMATIC, gtk.POLICY_AUTOMATIC)
-        scrolledbox.set_size_request(250, 200)
+		self.menu.popup(None, None, pos, icon, button, time)
 
-        self.model = gtk.ListStore(bool, str) #@+
+	def on_selection_changed(self, treeselection):
+			(model, iter) = treeselection.get_selected()
+			self.current_iter = iter
+			self.current_path = model.get_path(iter)
+			self.current_state = model.get_value(iter, 0)
+			self.current_service = model.get_value(iter, 1)
+			self._buttons_toogle(self.current_state)
 
-        for service in config.services:
-            cmd = "systemctl is-active %s.service" % (service,)
-            out = os.popen(cmd).read().strip()
-            if out == 'active':
-                state = True
-            else:
-                state = False
-            self.model.append([state, service])
+	###########
+	## ACTIONS
+	###########
+	def make(self):
+		self.window = Gtk.Window()
+		self.window.set_default_icon(self.icon)
+		self.window.set_title(self.title)
+		self.window.set_border_width(10)
 
-        # Treeview
-        self.treeview = gtk.TreeView(self.model) #@+
-        treeselection = self.treeview.get_selection()
-        treeselection.connect("changed", self.on_selection_changed)
+		def hide_window(w):
+			self.hide()
 
-        # State column
-        col = gtk.TreeViewColumn("State")
-        self.cell = gtk.CellRendererPixbuf()
-        col.pack_start(self.cell, expand=False)
-        col.set_cell_data_func(self.cell, self._render_icon)
-        self.treeview.insert_column(col, 0)
+		headerbar = Gtk.HeaderBar()
+		headerbar.set_show_close_button(False)
+		headerbar.set_title(self.title)
 
-        # Service column
-        col = gtk.TreeViewColumn("Service")
-        self.treeview.append_column(col)
-        cell = gtk.CellRendererText()
-        col.pack_start(cell, expand=False)
-        col.set_attributes(cell, text=1)
-        col.set_sort_column_id(1)
+		hide_btn_image = Gtk.Image.new_from_icon_name("window-close-symbolic", Gtk.IconSize.MENU)
+		hide_btn = Gtk.Button(image=hide_btn_image)
+		hide_btn.connect_object("clicked", hide_window, self.window)
 
-        scrolledbox.add(self.treeview)
+		headerbar.pack_end(hide_btn)
 
-        self.start_btn = gtk.Button("Start")
-        self.start_btn.connect_object("clicked", self.service_start, self.window)
-        self.start_btn.set_sensitive(False)
-        vbox_right.pack_start(self.start_btn, False)
+		vbox_left = Gtk.VBox()
+		vbox_right = Gtk.VBox(False, 3)
+		hbox = Gtk.HBox()
 
-        self.restart_btn = gtk.Button("Restart")
-        self.restart_btn.connect_object("clicked", self.service_restart, self.window)
-        self.restart_btn.set_sensitive(False)
-        vbox_right.pack_start(self.restart_btn, False)
+		scrolledbox = Gtk.ScrolledWindow()
+		scrolledbox.set_policy(Gtk.PolicyType.AUTOMATIC, Gtk.PolicyType.AUTOMATIC)
+		scrolledbox.set_size_request(250, 200)
 
-        self.stop_btn = gtk.Button("Stop")
-        self.stop_btn.connect_object("clicked", self.service_stop, self.window)
-        self.stop_btn.set_sensitive(False)
-        vbox_right.pack_start(self.stop_btn, False)
+		self.model = Gtk.ListStore(bool, str)
 
-        align = gtk.Alignment(1, 0, 0, 0)
-        align.add(vbox_right)
-        align.set_padding(0, 0, 10, 0)
+		for service in config.services:
+			cmd = "systemctl is-active %s.service" % (service,)
+			out = os.popen(cmd).read().strip()
+			if out == 'active':
+				state = True
+			else:
+				state = False
+			self.model.append([state, service])
 
-        vbox_left.pack_start(scrolledbox, False)
+		# Treeview
+		self.treeview = Gtk.TreeView(self.model)
+		treeselection = self.treeview.get_selection()
+		treeselection.connect("changed", self.on_selection_changed)
 
-        hbox.add(vbox_left)
-        hbox.add(align)
+		# State column
+		col = Gtk.TreeViewColumn("State")
+		self.cell = Gtk.CellRendererPixbuf()
+		col.pack_start(self.cell, expand=False)
+		col.set_cell_data_func(self.cell, self._render_icon)
+		self.treeview.insert_column(col, 0)
 
-        self.window.add(hbox)
+		# Service column
+		col = Gtk.TreeViewColumn("Service")
+		self.treeview.append_column(col)
+		cell = Gtk.CellRendererText()
+		col.pack_start(cell, expand=False)
+		col.set_attributes(cell, text=1)
+		col.set_sort_column_id(1)
 
-    def update(self):
-        treeselection = self.treeview.get_selection()
-        cmd = "systemctl is-active %s.service" % (self.current_service,)
-        out = os.popen(cmd).read().strip()
-        if out == 'active':
-            state = True
-        else:
-            state = False
-        self.model.set_value(self.current_iter, 0, state)
-        self._render_icon(0, self.cell, self.model, self.current_iter)
-        self.on_selection_changed(treeselection)
-        
-    def show(self):
-        self.window.show_all()
+		scrolledbox.add(self.treeview)
 
-    def hide(self):
-        self.window.hide()
+		vbox_left.pack_start(scrolledbox, False, False, 5)
 
-    def menu(self, event_button, event_time):
-        menu = gtk.Menu()
+		self.start_btn = Gtk.Button("Start")
+		self.start_btn.connect_object("clicked", self.service_start, self.window)
+		self.start_btn.set_sensitive(False)
+		vbox_right.pack_start(self.start_btn, False, False, 0)
 
-        about = gtk.MenuItem("About")
-        about.connect('activate', self.about)
-        about.show()
-        menu.append(about)
+		self.restart_btn = Gtk.Button("Restart")
+		self.restart_btn.connect_object("clicked", self.service_restart, self.window)
+		self.restart_btn.set_sensitive(False)
+		vbox_right.pack_start(self.restart_btn, False, False, 0)
 
-        quit = gtk.MenuItem("Quit")
-        quit.connect('activate', gtk.main_quit)
-        quit.show()
-        menu.append(quit)
+		self.stop_btn = Gtk.Button("Stop")
+		self.stop_btn.connect_object("clicked", self.service_stop, self.window)
+		self.stop_btn.set_sensitive(False)
+		vbox_right.pack_start(self.stop_btn, False, False, 0)
 
-        menu.popup(None, None, gtk.status_icon_position_menu,
-                   event_button, event_time, self.tray)
+		vbox_align = Gtk.Alignment()
+		vbox_align.add(vbox_right)
+		vbox_align.set_padding(0, 0, 10, 0)
 
-    def about(self, widget):
-        about_dialog = gtk.AboutDialog()
-        about_dialog.set_destroy_with_parent (True)
-        about_dialog.set_icon_name ("GTK Service Control")
-        about_dialog.set_name('GTK Service Control')
-        about_dialog.set_version('0.2')
-        about_dialog.set_copyright("(C) 2016 Stanislav Tamat")
-        about_dialog.set_comments(("GUI program to control system services"))
-        about_dialog.set_authors(['Stanislav Tamat <libastral.so@yandex.ru>'])
-        about_dialog.run()
-        about_dialog.destroy()
+		hbox.add(vbox_left)
+		hbox.add(vbox_align)
 
-    #######
-    ## CMD
-    #######
-    def service_start(self, widget):
-        cmd = "systemctl start %s.service" % (self.current_service,)
-        out = os.popen(cmd).read().strip()
-        print out
-        self.update()
+		self.window.set_titlebar(headerbar)
+		self.window.add(hbox)
 
-    def service_restart(self, widget):
-        cmd = "systemctl restart %s.service" % (self.current_service,)
-        out = os.popen(cmd).read().strip()
-        print out
-        self.update()
+	def update(self):
+		treeselection = self.treeview.get_selection()
+		cmd = "systemctl is-active %s.service" % (self.current_service,)
+		out = os.popen(cmd).read().strip()
+		if out == 'active':
+			state = True
+		else:
+			state = False
+		icon = self.cell.get_property('pixbuf')
+		self.model.set_value(self.current_iter, 0, state)
+		self._render_icon(0, self.cell, self.model, self.current_iter, icon)
+		self.on_selection_changed(treeselection)
 
-    def service_stop(self, widget):
-        cmd = "systemctl stop %s.service" % (self.current_service,)
-        out = os.popen(cmd).read().strip()
-        print out
-        self.update()
+	def show(self):
+		self.window.show_all()
 
-    ########
-    ## MISC
-    ########
-    def _render_icon(self, column, cell, model, iter):
-        data = self.model.get_value(iter, 0)   
-        if data == True:
-            stock = gtk.STOCK_YES
-        else:
-            stock = gtk.STOCK_NO
-        pixbuf = self.window.render_icon(stock_id=stock, size=gtk.ICON_SIZE_MENU)
-        cell.set_property('pixbuf', pixbuf)
+	def hide(self):
+		self.window.hide()
 
-    def _buttons_toogle(self, state):
-        if state:
-            self.start_btn.set_sensitive(False)
-            self.restart_btn.set_sensitive(True)
-            self.stop_btn.set_sensitive(True)
-        else:
-            self.start_btn.set_sensitive(True)
-            self.restart_btn.set_sensitive(False)
-            self.stop_btn.set_sensitive(False)
+	def add_menu_item(self, command, title):
+		aMenuitem = Gtk.MenuItem()
+		aMenuitem.set_label(title)
+		aMenuitem.connect("activate", command)
 
-    ########
-    ## MAIN
-    ########
-    def main(self):
-        # All PyGTK applications must have a gtk.main(). Control ends here
-        # and waits for an event to occur (like a key press or mouse event).
-        gtk.main()
+		self.menu.append(aMenuitem)
+		self.menu.show_all()
 
-if __name__ == "__main__":
-    servicecontrol = ServiceControl("GTK Service Control")
-    if config.settings["start_show"]:
-        servicecontrol.make()
-        servicecontrol.show()
-    servicecontrol.main()
-    
+	def get_tray_menu(self):
+		return self.menu
+
+	def about(self, w):
+		website = "https://github.com/YokiToki/gtk_service_ctl"
+		about = Gtk.AboutDialog()
+		about.set_destroy_with_parent(True)
+		about.set_name(self.title)
+		about.set_version("v0.3")
+		about.set_copyright("(C) 2016 Stanislav Tamat")
+		about.set_comments("GUI tray program to control system services")
+		about.set_website(website)
+		about.set_website_label(website)
+		about.set_authors(["Stanislav Tamat <libastral.so@yandex.ru>"])
+		about.run()
+		about.destroy()
+
+	#######
+	## CMD
+	#######
+	def service_start(self, w):
+		cmd = "systemctl start %s.service" % (self.current_service,)
+		out = os.popen(cmd).read().strip()
+		print out
+		self.update()
+
+	def service_restart(self, w):
+		cmd = "systemctl restart %s.service" % (self.current_service,)
+		out = os.popen(cmd).read().strip()
+		print out
+		self.update()
+
+	def service_stop(self, w):
+		cmd = "systemctl stop %s.service" % (self.current_service,)
+		out = os.popen(cmd).read().strip()
+		print out
+		self.update()
+
+	########
+	## MISC
+	########
+	def _render_icon(self, column, cell, model, iter, icon):
+		data = self.model.get_value(iter, 0)
+		if data == True:
+			stock = Gtk.STOCK_YES
+		else:
+			stock = Gtk.STOCK_NO
+
+		pixbuf = self.window.render_icon(stock, Gtk.IconSize.MENU)
+		cell.set_property('pixbuf', pixbuf)
+
+	def _buttons_toogle(self, state):
+		if state:
+			self.start_btn.set_sensitive(False)
+			self.restart_btn.set_sensitive(True)
+			self.stop_btn.set_sensitive(True)
+		else:
+			self.start_btn.set_sensitive(True)
+			self.restart_btn.set_sensitive(False)
+			self.stop_btn.set_sensitive(False)
+
+	def main(self):
+		Gtk.main()
+
+if __name__ == '__main__':
+	app = ServiceControl("GTK Service Control")
+	if config.settings["start_show"]:
+		app.show()
+	app.main()
