@@ -2,7 +2,7 @@
 
 Warning: This application need a root rights!
 
-![image](https://cloud.githubusercontent.com/assets/1845813/14382022/5ed33778-fdac-11e5-898c-b01a04288fb6.png)
+![image](https://cloud.githubusercontent.com/assets/1845813/14913730/e9ecf968-0e26-11e6-99e1-842872c73a4c.png)
 
 ## Dependencies
 
