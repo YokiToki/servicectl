@@ -23,14 +23,14 @@ class ServiceControl:
 		self.menu = Gtk.Menu()
 
 		if APPIND_SUPPORT:
-			self.tray = AppIndicator3.Indicator.new("gtk_service_ctl", Gtk.STOCK_YES, AppIndicator3.IndicatorCategory.SYSTEM_SERVICES)
+			self.tray = AppIndicator3.Indicator.new("gtk_service_ctl", Gtk.STOCK_PROPERTIES, AppIndicator3.IndicatorCategory.SYSTEM_SERVICES)
 			self.tray.set_status(AppIndicator3.IndicatorStatus.ACTIVE)
 			self.add_menu_item(self.on_click, "Show/Hide")
 			self.tray.set_menu(self.menu)
 			self.tray.set_title(title)
 		else:
 			self.tray = Gtk.StatusIcon()
-			self.tray.set_from_stock(Gtk.STOCK_YES)
+			self.tray.set_from_stock(Gtk.STOCK_PROPERTIES)
 			self.tray.connect('activate', self.on_click)
 			self.tray.connect('popup-menu', self.on_r_click)
 			self.tray.set_tooltip_text(title)
