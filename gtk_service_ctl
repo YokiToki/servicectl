@@ -210,6 +210,7 @@ class ServiceControl:
 		about.set_website(website)
 		about.set_website_label(website)
 		about.set_authors(["Stanislav Tamat <libastral.so@yandex.ru>"])
+		about.set_license_type(Gtk.License.MIT_X11)
 		about.run()
 		about.destroy()
 

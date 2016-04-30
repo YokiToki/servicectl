@@ -1,5 +1,7 @@
 # GTK Service Control
 
+GUI tray program to control systemd (systemctl) services
+
 ![image](https://cloud.githubusercontent.com/assets/1845813/14913730/e9ecf968-0e26-11e6-99e1-842872c73a4c.png)
 
 ## Dependencies
@@ -13,3 +15,7 @@ sudo apt-get install gir1.2-appindicator3-0.1
 If you get `ImportError: No module named pam` you need install 
 manually from [Python.org](https://pypi.python.org/pypi/python-pam) or
 `pip install python-pam`
+
+## License
+
+Licensed under the [MIT License](https://opensource.org/licenses/mit-license.php)
