@@ -1,9 +1,9 @@
 #!/usr/bin/python
 # -*- coding: utf-8 -*-
 
-import os
-import config
+import os, pam
 import gi
+import config
 gi.require_version('Gtk', '3.0')
 from gi.repository import Gtk
 
@@ -131,17 +131,17 @@ class ServiceControl:
 		vbox_left.pack_start(scrolledbox, False, False, 5)
 
 		self.start_btn = Gtk.Button("Start")
-		self.start_btn.connect_object("clicked", self.service_start, self.window)
+		self.start_btn.connect_object("clicked", lambda x: self.run_cmd("start"), self.window)
 		self.start_btn.set_sensitive(False)
 		vbox_right.pack_start(self.start_btn, False, False, 0)
 
 		self.restart_btn = Gtk.Button("Restart")
-		self.restart_btn.connect_object("clicked", self.service_restart, self.window)
+		self.restart_btn.connect_object("clicked", lambda x: self.run_cmd("restart"), self.window)
 		self.restart_btn.set_sensitive(False)
 		vbox_right.pack_start(self.restart_btn, False, False, 0)
 
 		self.stop_btn = Gtk.Button("Stop")
-		self.stop_btn.connect_object("clicked", self.service_stop, self.window)
+		self.stop_btn.connect_object("clicked", lambda x: self.run_cmd("stop"), self.window)
 		self.stop_btn.set_sensitive(False)
 		vbox_right.pack_start(self.stop_btn, False, False, 0)
 
@@ -202,23 +202,18 @@ class ServiceControl:
 	#######
 	## CMD
 	#######
-	def service_start(self, w):
-		cmd = "systemctl start %s.service" % (self.current_service,)
-		out = os.popen(cmd).read().strip()
-		print out
-		self.update()
+	def run_cmd(self, action):
+		if not hasattr(self, "pwd"):
+			title = self.title.replace(" ", "\ ")
+			self.password = os.popen("gksudo -d -p -D %s" % (title,)).read().strip()
+		if self.chk_pwd():
+			out = os.system('echo \'%s\'|sudo -S systemctl %s %s.service' % (self.password, action, self.current_service))
+			self.update()
 
-	def service_restart(self, w):
-		cmd = "systemctl restart %s.service" % (self.current_service,)
-		out = os.popen(cmd).read().strip()
-		print out
-		self.update()
-
-	def service_stop(self, w):
-		cmd = "systemctl stop %s.service" % (self.current_service,)
-		out = os.popen(cmd).read().strip()
-		print out
-		self.update()
+	def chk_pwd(self):
+		username = os.getenv('USER')
+		p = pam.pam()
+		return p.authenticate(username, self.password)
 
 	########
 	## MISC
