@@ -1,8 +1,8 @@
 #!/usr/bin/python
 # -*- coding: utf-8 -*-
 
-import os, pam
 import gi
+import systemctl
 import config
 gi.require_version('Gtk', '3.0')
 from gi.repository import Gtk
@@ -18,15 +18,16 @@ except:
 
 class ServiceControl:
 	def __init__(self, title):
-		icontheme = Gtk.IconTheme.get_default()
-		self.icon = icontheme.load_icon(Gtk.STOCK_PROPERTIES, 128, 0)
+		self.systemctl = systemctl.Systemctl()
+		self.icontheme = Gtk.IconTheme.get_default()
+		self.icon = self.icontheme.load_icon(Gtk.STOCK_PROPERTIES, 128, 0)
 		self.title = title
 		self.menu = Gtk.Menu()
 
 		if APPIND_SUPPORT:
 			self.tray = AppIndicator3.Indicator.new("gtk_service_ctl", Gtk.STOCK_PROPERTIES, AppIndicator3.IndicatorCategory.SYSTEM_SERVICES)
 			self.tray.set_status(AppIndicator3.IndicatorStatus.ACTIVE)
-			self.add_menu_item(self.on_click, "Show/Hide")
+			self._add_menu_item(self.on_click, "Show/Hide")
 			self.tray.set_menu(self.menu)
 			self.tray.set_title(title)
 		else:
@@ -36,8 +37,8 @@ class ServiceControl:
 			self.tray.connect('popup-menu', self.on_r_click)
 			self.tray.set_tooltip_text(title)
 
-		self.add_menu_item(self.about, "About")
-		self.add_menu_item(Gtk.main_quit, "Quit")
+		self._add_menu_item(self.about, "About")
+		self._add_menu_item(Gtk.main_quit, "Quit")
 		self.make()
 
 	#################
@@ -51,12 +52,22 @@ class ServiceControl:
 			self.show()
 
 	def on_r_click(self, icon, button, time):
-		self.get_tray_menu()
+		self._get_tray_menu()
 
 		def pos(menu, aicon):
 			return (Gtk.StatusIcon.position_menu(menu, aicon))
 
 		self.menu.popup(None, None, pos, icon, button, time)
+
+	def on_button_click(self, action):
+		if not hasattr(self, "pwd"): 
+			self.pwd = self.get_user_pw()
+		if self.systemctl.chk_pwd(self.pwd):
+			self.systemctl.run(self.pwd, action, self.current_service)
+			self.update()
+		else:
+			delattr(self, "pwd")
+			self.incorrect_pw()
 
 	def on_selection_changed(self, treeselection):
 		(model, iter) = treeselection.get_selected()
@@ -75,6 +86,7 @@ class ServiceControl:
 	###########
 	## ACTIONS
 	###########
+
 	def make(self):
 		self.window = Gtk.Window()
 		self.window.set_default_icon(self.icon)
@@ -105,12 +117,7 @@ class ServiceControl:
 		self.model = Gtk.ListStore(bool, str)
 
 		for service in config.services:
-			cmd = "systemctl is-active %s.service" % (service,)
-			out = os.popen(cmd).read().strip()
-			if out == 'active':
-				state = True
-			else:
-				state = False
+			state = self.systemctl.is_active(service)
 			self.model.append([state, service])
 
 		# Treeview
@@ -138,17 +145,17 @@ class ServiceControl:
 		vbox_left.pack_start(scrolledbox, False, False, 5)
 
 		self.start_btn = Gtk.Button("Start")
-		self.start_btn.connect_object("clicked", lambda x: self.run_cmd("start"), self.window)
+		self.start_btn.connect_object("clicked", lambda x: self.on_button_click("start"), self.window)
 		self.start_btn.set_sensitive(False)
 		vbox_right.pack_start(self.start_btn, False, False, 0)
 
 		self.restart_btn = Gtk.Button("Restart")
-		self.restart_btn.connect_object("clicked", lambda x: self.run_cmd("restart"), self.window)
+		self.restart_btn.connect_object("clicked", lambda x: self.on_button_click("restart"), self.window)
 		self.restart_btn.set_sensitive(False)
 		vbox_right.pack_start(self.restart_btn, False, False, 0)
 
 		self.stop_btn = Gtk.Button("Stop")
-		self.stop_btn.connect_object("clicked", lambda x: self.run_cmd("stop"), self.window)
+		self.stop_btn.connect_object("clicked", lambda x: self.on_button_click("stop"), self.window)
 		self.stop_btn.set_sensitive(False)
 		vbox_right.pack_start(self.stop_btn, False, False, 0)
 
@@ -164,12 +171,7 @@ class ServiceControl:
 
 	def update(self):
 		treeselection = self.treeview.get_selection()
-		cmd = "systemctl is-active %s.service" % (self.current_service,)
-		out = os.popen(cmd).read().strip()
-		if out == 'active':
-			state = True
-		else:
-			state = False
+		state = self.systemctl.is_active(self.current_service)
 		icon = self.cell.get_property('pixbuf')
 		self.model.set_value(self.current_iter, 0, state)
 		self._render_icon(0, self.cell, self.model, self.current_iter, icon)
@@ -181,24 +183,17 @@ class ServiceControl:
 	def hide(self):
 		self.window.hide()
 
-	def add_menu_item(self, command, title):
-		aMenuitem = Gtk.MenuItem()
-		aMenuitem.set_label(title)
-		aMenuitem.connect("activate", command)
-
-		self.menu.append(aMenuitem)
-		self.menu.show_all()
-
-	def get_tray_menu(self):
-		return self.menu
+	##########
+	## DIALOG
+	##########
 
 	def about(self, w):
 		website = "https://github.com/YokiToki/gtk_service_ctl"
-		# title = "%s | About" % (self.title,)
+		title = "%s | About" % (self.title,)
 		about = Gtk.AboutDialog()
 		headerbar = Gtk.HeaderBar()
 		headerbar.set_show_close_button(True)
-		# headerbar.set_title(title)
+		headerbar.set_title(title)
 		headerbar.show()
 		about.set_titlebar(headerbar)
 		about.set_transient_for(self.window)
@@ -213,26 +208,6 @@ class ServiceControl:
 		about.set_license_type(Gtk.License.MIT_X11)
 		about.run()
 		about.destroy()
-
-	#######
-	## CMD
-	#######
-	def run_cmd(self, action):
-		if not hasattr(self, "pwd"): 
-			self.pwd = self.get_user_pw()
-		if self.chk_pwd():
-			os.system('echo \'%s\'|sudo -S systemctl %s %s.service' % (self.pwd, action, self.current_service))
-			self.update()
-		else:
-			delattr(self, "pwd")
-			self.incorrect_pw()
-
-	def chk_pwd(self):
-		username = os.getenv('USER')
-		p = pam.pam()
-		if self.pwd == None:
-			return False
-		return p.authenticate(username, self.pwd)
 
 	def get_user_pw(self):
 		title = "%s | Password" % (self.title,)
@@ -312,6 +287,17 @@ class ServiceControl:
 			self.start_btn.set_sensitive(True)
 			self.restart_btn.set_sensitive(False)
 			self.stop_btn.set_sensitive(False)
+
+	def _add_menu_item(self, command, title):
+		aMenuitem = Gtk.MenuItem()
+		aMenuitem.set_label(title)
+		aMenuitem.connect("activate", command)
+
+		self.menu.append(aMenuitem)
+		self.menu.show_all()
+
+	def _get_tray_menu(self):
+		return self.menu
 
 	def main(self):
 		Gtk.main()
