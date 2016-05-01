@@ -1,4 +1,4 @@
-# GTK Service Control
+# Service Control
 
 GUI tray program to control systemd (systemctl) services
 
