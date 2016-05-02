@@ -1,0 +1,238 @@
+#!/usr/bin/python
+# -*- coding: utf-8 -*-
+
+import gi
+import systemctl
+import config
+gi.require_version('Gtk', '3.0')
+from gi.repository import Gtk
+from gi.repository import Gdk
+
+APPIND_SUPPORT = True
+
+try:
+	gi.require_version('AppIndicator3', '0.1')
+	from gi.repository import AppIndicator3
+except:
+	APPIND_SUPPORT = False
+
+class ServiceControl:
+	def __init__(self, title):
+		self.systemctl = systemctl.Systemctl()
+
+		self.builder = Gtk.Builder()
+		self.builder.add_from_file("servicectl.ui")
+		handlers = {
+			"onSelectionChanged": lambda x: self.on_selection_changed(),
+			"onButtonClickedStart": lambda x: self.on_button_click("start"),
+			"onButtonClickedRestart": lambda x: self.on_button_click("restart"),
+			"onButtonClickedStop": lambda x: self.on_button_click("stop")
+		}
+		self.builder.connect_signals(handlers)
+
+		self.icontheme = Gtk.IconTheme.get_default()
+		self.icon = self.icontheme.load_icon(Gtk.STOCK_PROPERTIES, 128, 0)
+		self.title = title
+
+		self.menu = self.builder.get_object("popupmenu")
+
+		if APPIND_SUPPORT:
+			self.tray = AppIndicator3.Indicator.new("gtk_service_ctl", Gtk.STOCK_PROPERTIES, AppIndicator3.IndicatorCategory.SYSTEM_SERVICES)
+			self.tray.set_status(AppIndicator3.IndicatorStatus.ACTIVE)
+			self._add_menu_item(self.on_click, "Show/Hide")
+			self.tray.set_menu(self.menu)
+			self.tray.set_title(title)
+		else:
+			self.tray = Gtk.StatusIcon()
+			self.tray.set_from_stock(Gtk.STOCK_PROPERTIES)
+			self.tray.connect('activate', self.on_click)
+			self.tray.connect('popup-menu', self.on_r_click)
+			self.tray.set_tooltip_text(title)
+
+		self._add_menu_item(self.about, "About")
+		self._add_menu_item(Gtk.main_quit, "Quit")
+
+		self.window = self.builder.get_object("window")
+		self.treeview = self.builder.get_object("treeview")
+		self.model = self.treeview.get_model()
+
+		col_state = self.builder.get_object("col-state")
+		self.cell_state = self.builder.get_object("cell-state")
+		col_state.set_cell_data_func(self.cell_state, self._render_icon)
+
+		for service in config.services:
+			state = self.systemctl.is_active(service)
+			self.model.append((service, state))
+
+		hide_btn_image = Gtk.Image.new_from_icon_name("window-close-symbolic", Gtk.IconSize.MENU)
+		hide_btn = Gtk.Button(image=hide_btn_image)
+		hide_btn.connect_object("clicked", lambda x: self.hide(), self.window)
+
+		headerbar = Gtk.HeaderBar()
+		headerbar.set_show_close_button(False)
+		headerbar.set_title(self.title)
+		headerbar.pack_end(hide_btn)
+
+		self.window.set_titlebar(headerbar)
+		self.window.show_all()
+
+	#################
+	## EVENTS HANDLE
+	#################
+
+	def on_click(self, w):
+		if self.window.get_property("visible"):
+			self.hide()
+		else:
+			self.show()
+
+	def on_r_click(self, icon, button, time):
+		self._get_tray_menu()
+
+		def pos(menu, aicon):
+			return (Gtk.StatusIcon.position_menu(menu, aicon))
+
+		self.menu.popup(None, None, pos, icon, button, time)
+
+	def on_button_click(self, action):
+		if not hasattr(self, "pwd"): 
+			self.pwd = self.get_pwd()
+		if self.systemctl.chk_pwd(self.pwd):
+			self.systemctl.run(self.pwd, action, self.current_service)
+			self.update()
+		else:
+			delattr(self, "pwd")
+			self.incorrect_pwd()
+
+	def on_selection_changed(self):
+		treeselection = self.builder.get_object("treeview-selection")
+		(model, iter) = treeselection.get_selected()
+		self.current_iter = iter
+		self.current_state = model.get_value(iter, 1)
+		self.current_service = model.get_value(iter, 0)
+		self._buttons_toogle(self.current_state)
+
+	def on_key_release(self, w, e):
+		if e.keyval == Gdk.KEY_Return:
+			w.response(Gtk.ResponseType.OK)
+		if e.keyval == Gdk.KEY_Escape:
+			w.destroy()
+
+	###########
+	## ACTIONS
+	###########
+
+	def update(self):
+		state = self.systemctl.is_active(self.current_service)
+		icon = self.cell_state.get_property('pixbuf')
+		self.model.set_value(self.current_iter, 1, state)
+		self._render_icon(1, self.cell_state, self.model, self.current_iter, icon)
+		self.on_selection_changed()
+
+	def show(self):
+		self.window.show_all()
+
+	def hide(self):
+		self.window.hide()
+
+	##########
+	## DIALOG
+	##########
+
+	def about(self, w):
+		title = "About  |  %s" % (self.title,)
+		dialog = self.builder.get_object("aboutdialog")
+
+		headerbar = Gtk.HeaderBar()
+		headerbar.set_show_close_button(True)
+		headerbar.set_title(title)
+		headerbar.show()
+
+		dialog.set_titlebar(headerbar)
+		dialog.run()
+		dialog.destroy()
+
+	def get_pwd(self):
+		title = "Password  |  %s" % (self.title,)
+
+		dialog = self.builder.get_object("getpwddialog")
+		dialog.connect("key-release-event", self.on_key_release)
+
+		headerbar = Gtk.HeaderBar()
+		headerbar.set_show_close_button(True)
+		headerbar.set_title(title)
+		headerbar.show()
+
+		dialog.set_titlebar(headerbar)
+		dialog.show_all()
+
+		response = dialog.run()
+		entry = self.builder.get_object("entry")
+		password = entry.get_text()
+
+		dialog.destroy()
+
+		if (response == Gtk.ResponseType.OK) and (password != ''):
+			return password
+		return None
+
+	def incorrect_pwd(self):
+		title = "Error  |  %s" % (self.title,)
+
+		dialog = self.builder.get_object("incorrectpwddialog")
+		dialog.connect("key-release-event", self.on_key_release)
+
+		headerbar = Gtk.HeaderBar()
+		headerbar.set_show_close_button(True)
+		headerbar.set_title(title)
+
+		dialog.set_titlebar(headerbar)
+		dialog.show_all()
+		dialog.run()
+		dialog.destroy()
+
+	########
+	## MISC
+	########
+	def _render_icon(self, column, cell, model, iter, icon):
+		data = self.model.get_value(iter, 1)
+		if data:
+			stock = Gtk.STOCK_YES
+		else:
+			stock = Gtk.STOCK_NO
+
+		pixbuf = self.window.render_icon(stock, Gtk.IconSize.MENU)
+		cell.set_property('pixbuf', pixbuf)
+
+	def _buttons_toogle(self, state):
+		button_start = self.builder.get_object('button_start')
+		button_restart = self.builder.get_object('button_restart')
+		button_stop = self.builder.get_object('button_stop')
+		if state:
+			button_start.set_sensitive(False)
+			button_restart.set_sensitive(True)
+			button_stop.set_sensitive(True)
+		else:
+			button_start.set_sensitive(True)
+			button_restart.set_sensitive(False)
+			button_stop.set_sensitive(False)
+
+	def _add_menu_item(self, command, title):
+		menuitem = Gtk.MenuItem()
+		menuitem.set_label(title)
+		menuitem.connect("activate", command)
+
+		self.menu.append(menuitem)
+		self.menu.show_all()
+
+	def _get_tray_menu(self):
+		return self.menu
+
+	def main(self):
+		Gtk.main()
+
+if __name__ == '__main__':
+	app = ServiceControl("Service Control")
+	if config.settings["start_show"]:
+		app.show()
+	app.main()
