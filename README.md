@@ -2,7 +2,7 @@
 
 GUI tray program to control systemd (systemctl) services
 
-![image](https://cloud.githubusercontent.com/assets/1845813/14913730/e9ecf968-0e26-11e6-99e1-842872c73a4c.png)
+![image](https://cloud.githubusercontent.com/assets/1845813/14960621/5891ea1c-10b7-11e6-88b3-68214d667a6b.png)
 
 ## Dependencies
 
