@@ -9,6 +9,7 @@ from gi.repository import Gtk
 from gi.repository import Gdk
 
 APPIND_SUPPORT = True
+STATE_ID = 2
 
 try:
 	gi.require_version('AppIndicator3', '0.1')
@@ -24,9 +25,9 @@ class ServiceControl:
 		self.builder.add_from_file("servicectl.ui")
 		handlers = {
 			"onSelectionChanged": lambda x: self.on_selection_changed(),
-			"onButtonClickedStart": lambda x: self.on_button_click("start"),
-			"onButtonClickedRestart": lambda x: self.on_button_click("restart"),
-			"onButtonClickedStop": lambda x: self.on_button_click("stop")
+			"onButtonStartStopClicked": lambda x: self.on_button_click_multi_action("startstop"),
+			"onButtonRestartClicked": lambda x: self.on_button_click("restart"),
+			"onButtonReloadClicked": lambda x: self.on_button_click("reload")
 		}
 		self.builder.connect_signals(handlers)
 
@@ -61,8 +62,9 @@ class ServiceControl:
 		col_state.set_cell_data_func(self.cell_state, self._render_icon)
 
 		for service in config.services:
+			description = self.systemctl.description(service)
 			state = self.systemctl.is_active(service)
-			self.model.append((service, state))
+			self.model.append((service, description, state))
 
 		hide_btn_image = Gtk.Image.new_from_icon_name("window-close-symbolic", Gtk.IconSize.MENU)
 		hide_btn = Gtk.Button(image=hide_btn_image)
@@ -94,11 +96,20 @@ class ServiceControl:
 
 		self.menu.popup(None, None, pos, icon, button, time)
 
+	def on_button_click_multi_action(self, action):
+		if action == "startstop":
+			if self.current_state:
+				action = "stop"
+			else:
+				action = "start"
+		self.on_button_click(action)
+
 	def on_button_click(self, action):
 		if not hasattr(self, "pwd"): 
 			self.pwd = self.get_pwd()
 		if self.systemctl.chk_pwd(self.pwd):
-			self.systemctl.run(self.pwd, action, self.current_service)
+			while self.systemctl.run(self.pwd, action, self.current_service):
+				pass
 			self.update()
 		else:
 			delattr(self, "pwd")
@@ -108,8 +119,8 @@ class ServiceControl:
 		treeselection = self.builder.get_object("treeview-selection")
 		(model, iter) = treeselection.get_selected()
 		self.current_iter = iter
-		self.current_state = model.get_value(iter, 1)
 		self.current_service = model.get_value(iter, 0)
+		self.current_state = model.get_value(iter, STATE_ID)
 		self._buttons_toogle(self.current_state)
 
 	def on_key_release(self, w, e):
@@ -125,8 +136,8 @@ class ServiceControl:
 	def update(self):
 		state = self.systemctl.is_active(self.current_service)
 		icon = self.cell_state.get_property('pixbuf')
-		self.model.set_value(self.current_iter, 1, state)
-		self._render_icon(1, self.cell_state, self.model, self.current_iter, icon)
+		self.model.set_value(self.current_iter, STATE_ID, state)
+		self._render_icon(STATE_ID, self.cell_state, self.model, self.current_iter, icon)
 		self.on_selection_changed()
 
 	def show(self):
@@ -144,7 +155,7 @@ class ServiceControl:
 		dialog = self.builder.get_object("aboutdialog")
 
 		headerbar = Gtk.HeaderBar()
-		headerbar.set_show_close_button(True)
+		headerbar.set_show_close_button(False)
 		headerbar.set_title(title)
 		headerbar.show()
 
@@ -159,7 +170,7 @@ class ServiceControl:
 		dialog.connect("key-release-event", self.on_key_release)
 
 		headerbar = Gtk.HeaderBar()
-		headerbar.set_show_close_button(True)
+		headerbar.set_show_close_button(False)
 		headerbar.set_title(title)
 		headerbar.show()
 
@@ -183,7 +194,7 @@ class ServiceControl:
 		dialog.connect("key-release-event", self.on_key_release)
 
 		headerbar = Gtk.HeaderBar()
-		headerbar.set_show_close_button(True)
+		headerbar.set_show_close_button(False)
 		headerbar.set_title(title)
 
 		dialog.set_titlebar(headerbar)
@@ -195,7 +206,7 @@ class ServiceControl:
 	## MISC
 	########
 	def _render_icon(self, column, cell, model, iter, icon):
-		data = self.model.get_value(iter, 1)
+		data = self.model.get_value(iter, STATE_ID)
 		if data:
 			stock = Gtk.STOCK_YES
 		else:
@@ -205,17 +216,16 @@ class ServiceControl:
 		cell.set_property('pixbuf', pixbuf)
 
 	def _buttons_toogle(self, state):
-		button_start = self.builder.get_object('button_start')
+		button_enable_disable = self.builder.get_object('button_enable_disable')
+		button_start_stop = self.builder.get_object('button_start_stop')
 		button_restart = self.builder.get_object('button_restart')
-		button_stop = self.builder.get_object('button_stop')
+		button_reload = self.builder.get_object('button_reload')
 		if state:
-			button_start.set_sensitive(False)
 			button_restart.set_sensitive(True)
-			button_stop.set_sensitive(True)
+			button_reload.set_sensitive(True)
 		else:
-			button_start.set_sensitive(True)
 			button_restart.set_sensitive(False)
-			button_stop.set_sensitive(False)
+			button_reload.set_sensitive(False)
 
 	def _add_menu_item(self, command, title):
 		menuitem = Gtk.MenuItem()
