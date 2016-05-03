@@ -3,7 +3,8 @@ services = {
   'mongodb',
   'mysql',
   'nginx',
-  'php5-fpm'
+  'php5-fpm',
+  'ssh'
 }
 
 services = sorted(services)
