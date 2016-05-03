@@ -157,7 +157,7 @@
     <property name="gravity">west</property>
     <property name="transient_for">window</property>
     <property name="program_name">Service Control</property>
-    <property name="version">0.4</property>
+    <property name="version">0.5</property>
     <property name="copyright" translatable="yes">(C) 2016 Stanislav Tamat</property>
     <property name="website">https://github.com/YokiToki/service_ctl</property>
     <property name="website_label" translatable="yes">https://github.com/YokiToki/service_ctl</property>
