@@ -51,6 +51,6 @@ class Systemctl():
 				return True
 
 		else:
-			
+
 			auth = pam.pam()
-			return auth.authenticate(username, pwd)
+			return auth.authenticate(user, pwd)
