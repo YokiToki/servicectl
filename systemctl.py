@@ -1,7 +1,14 @@
 #!/usr/bin/python
 # -*- coding: utf-8 -*-
 
-import os, pam
+import os
+
+PAM_LIB = True
+try:
+	import PAM
+except ImportError:
+	PAM_LIB = False
+	import pam
 
 class Systemctl():
 
@@ -24,8 +31,26 @@ class Systemctl():
 		return os.popen("systemctl show -p Description %s.service" % (service,)).read().replace("Description=", "").strip()
 
 	def chk_pwd(self, pwd):
-		username = os.getenv('USER')
-		p = pam.pam()
+		user = os.getenv('USER')
 		if pwd == None:
 			return False
-		return p.authenticate(username, pwd)
+		if PAM_LIB:
+			def pam_conv(a, q, d):
+				return [(pwd, 0)]
+
+			auth = PAM.pam()
+			auth.start("passwd")
+			auth.set_item(PAM.PAM_USER, user)
+			auth.set_item(PAM.PAM_CONV, pam_conv)
+			try:
+				auth.authenticate()
+				auth.acct_mgmt()
+			except:
+				return False
+			else:
+				return True
+
+		else:
+			
+			auth = pam.pam()
+			return auth.authenticate(username, pwd)
