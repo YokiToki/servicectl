@@ -161,7 +161,7 @@ class ServiceControl:
 
 		dialog.set_titlebar(headerbar)
 		dialog.run()
-		dialog.destroy()
+		dialog.hide()
 
 	def get_pwd(self):
 		title = "Password  |  %s" % (self.title,)
@@ -180,8 +180,8 @@ class ServiceControl:
 		response = dialog.run()
 		entry = self.builder.get_object("entry")
 		password = entry.get_text()
-
-		dialog.destroy()
+		
+		dialog.hide()
 
 		if (response == Gtk.ResponseType.OK) and (password != ''):
 			return password
@@ -200,7 +200,7 @@ class ServiceControl:
 		dialog.set_titlebar(headerbar)
 		dialog.show_all()
 		dialog.run()
-		dialog.destroy()
+		dialog.hide()
 
 	########
 	## MISC
