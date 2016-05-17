@@ -12,6 +12,9 @@ except ImportError:
 
 class Systemctl():
 
+	def get_path(self):
+		return os.path.dirname(os.path.realpath(__file__))
+
 	def run(self, pwd, action, service):
 		os.system('echo \'%s\'|sudo -S systemctl %s %s.service' % (pwd, action, service))
 
