@@ -1,0 +1,57 @@
+<?xml version="1.0" encoding="UTF-8" standalone="no"?>
+<svg
+   xmlns:dc="http://purl.org/dc/elements/1.1/"
+   xmlns:cc="http://creativecommons.org/ns#"
+   xmlns:rdf="http://www.w3.org/1999/02/22-rdf-syntax-ns#"
+   xmlns:svg="http://www.w3.org/2000/svg"
+   xmlns="http://www.w3.org/2000/svg"
+   xmlns:sodipodi="http://sodipodi.sourceforge.net/DTD/sodipodi-0.dtd"
+   xmlns:inkscape="http://www.inkscape.org/namespaces/inkscape"
+   width="1.77778in"
+   height="1.77778in"
+   viewBox="0 0 128 128"
+   id="svg2"
+   version="1.1"
+   inkscape:version="0.48.5 r10040"
+   sodipodi:docname="main.svg">
+  <metadata
+     id="metadata9">
+    <rdf:RDF>
+      <cc:Work
+         rdf:about="">
+        <dc:format>image/svg+xml</dc:format>
+        <dc:type
+           rdf:resource="http://purl.org/dc/dcmitype/StillImage" />
+      </cc:Work>
+    </rdf:RDF>
+  </metadata>
+  <defs
+     id="defs7" />
+  <sodipodi:namedview
+     pagecolor="#ffffff"
+     bordercolor="#666666"
+     borderopacity="1"
+     objecttolerance="10"
+     gridtolerance="10"
+     guidetolerance="10"
+     inkscape:pageopacity="0"
+     inkscape:pageshadow="2"
+     inkscape:window-width="1280"
+     inkscape:window-height="971"
+     id="namedview5"
+     showgrid="false"
+     inkscape:zoom="4.1719248"
+     inkscape:cx="72.98488"
+     inkscape:cy="89.245886"
+     inkscape:window-x="1366"
+     inkscape:window-y="25"
+     inkscape:window-maximized="1"
+     inkscape:current-layer="svg2" />
+  <path
+     id="main"
+     fill="none"
+     stroke="black"
+     stroke-width="1"
+     d="M 78.06,15.90            C 113.13,25.79 125.47,69.49 102.05,96.81              97.20,102.47 91.80,106.33 85.09,109.48              77.80,112.91 70.43,114.09 62.44,114.00              23.50,113.54 1.64,69.87 21.39,37.44              29.73,23.74 42.34,16.86 57.75,14.33              64.46,13.51 71.55,14.06 78.06,15.90 Z            M 61.58,41.00            C 69.67,41.00 75.60,42.85 79.36,46.53              83.12,50.21 85.00,56.01 85.00,63.94              85.00,71.92 83.12,77.76 79.36,81.45              75.60,85.15 69.67,87.00 61.58,87.00              61.58,87.00 52.00,87.00 52.00,87.00              52.00,87.00 52.00,41.00 52.00,41.00              52.00,41.00 61.58,41.00 61.58,41.00 Z            M 44.00,93.00            C 44.00,93.00 60.20,93.00 60.20,93.00              71.44,93.00 79.72,90.66 85.03,85.97              90.34,81.29 93.00,73.94 93.00,63.94              93.00,53.99 90.35,46.68 85.06,42.02              79.78,37.34 71.49,35.00 60.20,35.00              60.20,35.00 44.00,35.00 44.00,35.00              44.00,35.00 44.00,93.00 44.00,93.00 Z"
+     style="fill:#778783;fill-opacity:1;stroke:none" />
+</svg>

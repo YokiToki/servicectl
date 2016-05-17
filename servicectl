@@ -5,11 +5,13 @@ import gi
 import systemctl
 import config
 gi.require_version('Gtk', '3.0')
-from gi.repository import Gtk
-from gi.repository import Gdk
+from gi.repository import Gtk, Gdk, GdkPixbuf
 
 APPIND_SUPPORT = True
 STATE_ID = 2
+ICON_MAIN = "icons/main.svg"
+ICON_OK = "icons/ok.svg"
+ICON_FAIL = "icons/fail.svg"
 
 try:
 	gi.require_version('AppIndicator3', '0.1')
@@ -21,6 +23,9 @@ class ServiceControl:
 	def __init__(self, title):
 		self.systemctl = systemctl.Systemctl()
 
+		self.icon = "%s/%s" % (self.systemctl.get_path(), ICON_MAIN)
+		self.title = title
+
 		self.builder = Gtk.Builder()
 		self.builder.add_from_file("servicectl.ui")
 		handlers = {
@@ -31,21 +36,17 @@ class ServiceControl:
 		}
 		self.builder.connect_signals(handlers)
 
-		self.icontheme = Gtk.IconTheme.get_default()
-		self.icon = self.icontheme.load_icon(Gtk.STOCK_PROPERTIES, 128, 0)
-		self.title = title
-
 		self.menu = self.builder.get_object("popupmenu")
 
 		if APPIND_SUPPORT:
-			self.tray = AppIndicator3.Indicator.new("gtk_service_ctl", Gtk.STOCK_PROPERTIES, AppIndicator3.IndicatorCategory.SYSTEM_SERVICES)
+			self.tray = AppIndicator3.Indicator.new("servicectl", self.icon, AppIndicator3.IndicatorCategory.SYSTEM_SERVICES)
 			self.tray.set_status(AppIndicator3.IndicatorStatus.ACTIVE)
 			self._add_menu_item(self.on_click, "Show/Hide")
 			self.tray.set_menu(self.menu)
 			self.tray.set_title(title)
 		else:
 			self.tray = Gtk.StatusIcon()
-			self.tray.set_from_stock(Gtk.STOCK_PROPERTIES)
+			self.tray.set_from_file(self.icon)
 			self.tray.connect('activate', self.on_click)
 			self.tray.connect('popup-menu', self.on_r_click)
 			self.tray.set_tooltip_text(title)
@@ -72,10 +73,11 @@ class ServiceControl:
 
 		headerbar = Gtk.HeaderBar()
 		headerbar.set_show_close_button(False)
-		headerbar.set_title(self.title)
+		headerbar.set_title(title)
 		headerbar.pack_end(hide_btn)
 
 		self.window.set_titlebar(headerbar)
+		self.window.set_icon_from_file(self.icon)
 		self.window.show_all()
 
 	#################
@@ -159,7 +161,10 @@ class ServiceControl:
 		headerbar.set_title(title)
 		headerbar.show()
 
+		pixbuf = GdkPixbuf.Pixbuf.new_from_file(self.icon)
+
 		dialog.set_titlebar(headerbar)
+		dialog.set_logo(pixbuf)
 		dialog.run()
 		dialog.hide()
 
@@ -208,11 +213,11 @@ class ServiceControl:
 	def _render_icon(self, column, cell, model, iter, icon):
 		data = self.model.get_value(iter, STATE_ID)
 		if data:
-			stock = Gtk.STOCK_YES
+			icon = ICON_OK
 		else:
-			stock = Gtk.STOCK_NO
+			icon = ICON_FAIL
 
-		pixbuf = self.window.render_icon(stock, Gtk.IconSize.MENU)
+		pixbuf = GdkPixbuf.Pixbuf.new_from_file_at_scale(icon, width=22, height=22, preserve_aspect_ratio=False)
 		cell.set_property('pixbuf', pixbuf)
 
 	def _buttons_toogle(self, state):

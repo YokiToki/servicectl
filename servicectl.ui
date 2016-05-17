@@ -162,7 +162,6 @@
     <property name="website">https://github.com/YokiToki/service_ctl</property>
     <property name="website_label" translatable="yes">https://github.com/YokiToki/service_ctl</property>
     <property name="authors">Stanislav Tamat &lt;libastral.so@yandex.ru&gt;</property>
-    <property name="logo_icon_name">document-properties</property>
     <property name="license_type">mit-x11</property>
     <child internal-child="vbox">
       <object class="GtkBox" id="aboutdialog-vbox">
