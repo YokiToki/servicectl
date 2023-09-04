@@ -78,7 +78,8 @@ class ServiceControl:
 
 		self.window.set_titlebar(headerbar)
 		self.window.set_icon_from_file(self.icon)
-		self.window.show_all()
+		if config.settings["start_show"]:
+			self.window.show_all()
 
 	#################
 	## EVENTS HANDLE
@@ -248,6 +249,4 @@ class ServiceControl:
 
 if __name__ == '__main__':
 	app = ServiceControl("Service Control")
-	if config.settings["start_show"]:
-		app.show()
 	app.main()
